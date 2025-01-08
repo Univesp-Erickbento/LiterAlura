@@ -1,9 +1,8 @@
 package com.bento.LiterAlura.service.model;
 
 import com.bento.LiterAlura.service.model.DTOs.LivroDTO;
-import com.bento.LiterAlura.repositories.LivroRepository;
-import com.bento.LiterAlura.service.model.entities.Livro;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -13,62 +12,54 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
-import java.util.Optional;
 
 @Service
 public class ConsumoApi {
 
-    @Autowired
-    private LivroRepository livroRepository;
+    private final HttpClient httpClient = HttpClient.newHttpClient();
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public String obterDados(String baseUrl, String query) {
-        HttpClient client = HttpClient.newHttpClient();
+    /**
+     * Busca dados da API externa usando o título do livro.
+     *
+     * @param baseUrl URL base da API.
+     * @param query Consulta a ser feita na API.
+     * @return Objeto JsonNode contendo os resultados da API.
+     */
+    public JsonNode buscarNaApiExterna(String baseUrl, String query) {
+        try {
+            // Codifica a consulta
+            String encodedQuery = URLEncoder.encode(query.trim(), StandardCharsets.UTF_8);
+            String url = baseUrl + "/?" + encodedQuery;
 
-        // Substituir espaços por "%20" e codificar a query inteira
-        String formattedQuery = query.replace(" ", "%20");
-        String encodedQuery = URLEncoder.encode(formattedQuery, StandardCharsets.UTF_8);
+            System.out.println("URL gerada para a API: " + url);
 
-        // Montar a URL final no formato correto
-        String url = baseUrl + "/?" + encodedQuery;
-
-        // Exibir a URL para depuração
-        System.out.println("URL completa: " + url);
-
-        // Buscar livro no banco de dados
-        Optional<Livro> livroOptional = livroRepository.findByTitulo(query);
-
-        if (livroOptional.isPresent()) {
-            // Livro encontrado no banco, converter para DTO
-            Livro livro = livroOptional.get();
-            LivroDTO livroDTO = converterParaDTO(livro);
-            // Retornar informações do livro ou fazer outro processamento
-            return "Livro encontrado no banco de dados: " + livroDTO.getTitulo();
-        } else {
-            // Livro não encontrado, buscar na API externa
+            // Cria a requisição HTTP
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
                     .build();
-            HttpResponse<String> response;
 
-            try {
-                response = client.send(request, HttpResponse.BodyHandlers.ofString());
-            } catch (IOException | InterruptedException e) {
-                throw new RuntimeException("Erro ao acessar a API: " + e.getMessage(), e);
-            }
+            // Envia a requisição e obtém a resposta
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
-            // Exibir a resposta para depuração
-            System.out.println("Resposta da API: " + response.body());
-
-            return response.body();
+            // Retorna a resposta como um objeto JsonNode
+            return objectMapper.readTree(response.body());
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException("Erro ao acessar a API: " + e.getMessage(), e);
         }
     }
 
-    private LivroDTO converterParaDTO(Livro livro) {
-        LivroDTO livroDTO = new LivroDTO();
-        livroDTO.setTitulo(livro.getTitulo());
-        livroDTO.setAutor(livro.getAutor());
-        livroDTO.setIdioma(livro.getIdioma());
-        livroDTO.setNumeroDownloads(livro.getNumeroDownloads());
-        return livroDTO;
+    /**
+     * Converte os dados recebidos da API em um objeto LivroDTO.
+     *
+     * @param jsonNode Nó do JSON contendo os dados do livro.
+     * @return LivroDTO preenchido com os dados do JSON.
+     */
+    public LivroDTO converterParaDTO(JsonNode jsonNode) {
+        try {
+            return objectMapper.treeToValue(jsonNode, LivroDTO.class);
+        } catch (IOException e) {
+            throw new RuntimeException("Erro ao converter JSON para LivroDTO: " + e.getMessage(), e);
+        }
     }
 }

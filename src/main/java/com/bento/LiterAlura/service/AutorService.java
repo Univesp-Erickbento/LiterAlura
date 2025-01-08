@@ -1,6 +1,7 @@
 package com.bento.LiterAlura.service;
 
 import com.bento.LiterAlura.service.model.ConsumoApi;
+import com.fasterxml.jackson.databind.JsonNode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -24,7 +25,21 @@ public class AutorService {
         System.out.println("Insira o ano que deseja pesquisar:");
         int ano = scanner.nextInt();
         scanner.nextLine();
-        String jsonResponse = consumoApi.obterDados("https://gutendex.com/books", "author_year_start=" + ano);
-        System.out.println("Autores vivos a partir de " + ano + ": " + jsonResponse);
+
+        // Busca os autores vivos na API externa
+        JsonNode apiResponse = consumoApi.buscarNaApiExterna("https://gutendex.com/books", "author_year_start=" + ano);
+
+        // Verifica se há resultados e exibe os dados
+        JsonNode results = apiResponse.path("results");
+
+        if (results.isArray() && results.size() > 0) {
+            System.out.println("Autores vivos a partir de " + ano + ":");
+            results.forEach(author -> {
+                String name = author.path("name").asText();
+                System.out.println("- " + name);
+            });
+        } else {
+            System.out.println("Nenhum autor encontrado vivo a partir do ano " + ano);
+        }
     }
 }
