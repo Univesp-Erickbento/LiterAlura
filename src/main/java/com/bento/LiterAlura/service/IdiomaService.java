@@ -2,11 +2,13 @@ package com.bento.LiterAlura.service;
 
 import com.bento.LiterAlura.repositories.LivroRepository;
 import com.bento.LiterAlura.service.model.ConsumoApi;
+import com.bento.LiterAlura.service.model.DTOs.LivroDTO;
 import com.bento.LiterAlura.service.model.entities.Livro;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.util.Optional;
 import java.util.Scanner;
 
@@ -33,21 +35,35 @@ public class IdiomaService {
             return;
         }
 
-        // Caso não exista, realiza a busca na API externa
+        // Busca na API externa
         JsonNode apiResponse = consumoApi.buscarNaApiExterna("https://gutendex.com/books", "languages=" + idioma);
-
-        // Processa os resultados
         JsonNode results = apiResponse.path("results");
 
         if (results.isArray() && results.size() > 0) {
             System.out.println("Livros encontrados no idioma " + idioma + ". Salvando no banco de dados...");
 
             results.forEach(book -> {
-                String title = book.path("title").asText();
-                String author = book.path("authors").size() > 0 ? book.path("authors").get(0).path("name").asText() : "Autor desconhecido";
-                Livro livro = new Livro(title, author, idioma, 0);
+                LivroDTO livroDTO = consumoApi.converterParaDTO(book);
+                LivroDTO.AuthorDTO author = livroDTO.getAuthors().length > 0 ? livroDTO.getAuthors()[0] : null;
+
+                // Dados do autor
+                String nomeAutor = author != null ? author.getName() : "Autor desconhecido";
+                LocalDate dataNascimento = author != null && author.getBirthYear() != null ? LocalDate.of(author.getBirthYear(), 1, 1) : null;
+                LocalDate dataFalecimento = author != null && author.getDeathYear() != null ? LocalDate.of(author.getDeathYear(), 1, 1) : null;
+
+                // Cria o objeto Livro
+                Livro livro = new Livro(
+                        livroDTO.getTitulo(),
+                        nomeAutor,
+                        idioma,
+                        livroDTO.getNumeroDownloads(),
+                        dataNascimento,
+                        dataFalecimento
+                );
+
+                // Salva no banco
                 livroRepository.save(livro);
-                System.out.println("- Livro salvo: " + title);
+                System.out.println("- Livro salvo: " + livro.getTitulo() + " (Autor: " + nomeAutor + ")");
             });
         } else {
             System.out.println("Nenhum livro encontrado no idioma " + idioma);

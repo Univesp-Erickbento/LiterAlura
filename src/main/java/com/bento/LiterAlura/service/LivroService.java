@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.util.Scanner;
 
 @Service
@@ -47,8 +48,19 @@ public class LivroService {
             // Converte o JSON para um LivroDTO
             LivroDTO livroDTO = consumoApi.converterParaDTO(firstResult);
 
-            // Cria um objeto Livro com os dados e o idioma selecionado
-            Livro livro = new Livro(livroDTO.getTitulo(), livroDTO.getAutor(), idioma, livroDTO.getNumeroDownloads());
+            // Define datas fictícias ou obtenha os valores corretos, se disponíveis
+            LocalDate dataNascimentoAutor = livroDTO.getDataNascimentoAutor() != null ? livroDTO.getDataNascimentoAutor() : LocalDate.of(1900, 1, 1);
+            LocalDate dataFalecimentoAutor = livroDTO.getDataFalecimentoAutor();
+
+            // Cria um objeto Livro com os dados
+            Livro livro = new Livro(
+                    livroDTO.getTitulo(),
+                    livroDTO.getAutor(),
+                    idioma,
+                    livroDTO.getNumeroDownloads(),
+                    dataNascimentoAutor,
+                    dataFalecimentoAutor
+            );
 
             // Salvar no banco de dados
             livroRepository.save(livro);
@@ -64,7 +76,9 @@ public class LivroService {
                 System.out.println("Título: " + livro.getTitulo() +
                         ", Autor: " + livro.getAutor() +
                         ", Idioma: " + livro.getIdioma() +
-                        ", Número de Downloads: " + livro.getNumeroDownloads())
+                        ", Número de Downloads: " + livro.getNumeroDownloads() +
+                        ", Data de Nascimento do Autor: " + livro.getDataNascimentoAutor() +
+                        ", Data de Falecimento do Autor: " + (livro.getDataFalecimentoAutor() != null ? livro.getDataFalecimentoAutor() : "Ainda vivo"))
         );
     }
 }
